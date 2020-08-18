@@ -10,7 +10,6 @@ mut:
 	ui            Ui = Ui{}
 	theme         &Theme = themes[0]
 	theme_idx     int = 0
-	// victory_image gg.Image
 	board         Board
 	undo          []Board
 	atickers      [4][4]int
@@ -19,35 +18,9 @@ mut:
 	moves         int
 }
 
-struct Ui {
-mut:
-	tile_size     int = 100
-	border_size   int = 32
-	padding_size  int = 16
-	header_size   int = 16
-	font_size     int = 54
-	window_width  int = 544
-	window_height int = 560
-}
-
-struct Tile {
-	color   gx.Color
-}
-
 struct Pos {
 	x int = -1
 	y int = -1
-}
-
-struct TextLabel {
-	text string
-	pos  Pos
-	cfg  gx.TextCfg
-}
-
-struct ImageLabel {
-	pos Pos
-	dim Pos
 }
 
 struct Board {
@@ -219,16 +192,10 @@ fn (mut app App) check_for_game_over() {
 				zeros++
 				continue
 			}
-			if x > 0 && fidx == app.board.field[y][x - 1] {
-				remaining_merges++
-			}
-			if x < 4 - 1 && fidx == app.board.field[y][x + 1] {
-				remaining_merges++
-			}
-			if y > 0 && fidx == app.board.field[y - 1][x] {
-				remaining_merges++
-			}
-			if y < 4 - 1 && fidx == app.board.field[y + 1][x] {
+			if (x > 0 && fidx == app.board.field[y][x - 1])
+				|| (x < 4 - 1 && fidx == app.board.field[y][x + 1])
+				|| (y > 0 && fidx == app.board.field[y - 1][x])
+				|| (y < 4 - 1 && fidx == app.board.field[y + 1][x]) {
 				remaining_merges++
 			}
 		}
@@ -259,7 +226,6 @@ fn (mut app App) new_random_tile() {
 		random_value := if rint == 0 { 2 } else { 1 }
 		app.board.field[empty_pos.y][empty_pos.x] = random_value
 		app.atickers[empty_pos.y][empty_pos.x] = 15
-		// eprintln('>>>>> new_random_tile, app.board.points: $app.board.points | random_value: $random_value at ${no_newlines(empty_pos.str())}')
 	}
 	app.check_for_victory()
 	app.check_for_game_over()
@@ -304,7 +270,6 @@ $if android {
 	#define fprintf(a, ...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 }
 
-
 // Utility functions, to avoid importing `math`
 [inline]
 fn min(a, b int) int {
@@ -322,12 +287,12 @@ fn abs(a int) int {
 }
 
 fn main() {
-	println('\n'.repeat(30))
 	mut app := &App{ gg: 0 }
 	app.new_game()
 
 	mut font_path := os.resource_abs_path(os.join_path('assets', 'RobotoMono-Regular.ttf'))
 	$if android {
+		// the `assets/` folder is implied, since we're getting the font straight from the apk
 		font_path = 'RobotoMono-Regular.ttf'
 	}
 
@@ -343,7 +308,5 @@ fn main() {
 		user_data: app
 		font_path: font_path
 	})
-	// app.victory_image = app.gg.create_image(os.resource_abs_path(os.join_path('assets',
-	// 	'victory.png')))
 	app.gg.run()
 }

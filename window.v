@@ -1,6 +1,17 @@
 import sokol.sapp
 import gx
 
+struct Ui {
+mut:
+	tile_size     int = 100
+	border_size   int = 32
+	padding_size  int = 16
+	header_size   int = 16
+	font_size     int = 54
+	window_width  int = 544
+	window_height int = 560
+}
+
 struct Theme {
 	bg_color        gx.Color
 	padding_color   gx.Color
@@ -134,15 +145,9 @@ fn (mut app App) resize() {
 	app.ui.window_height = h
 	app.ui.padding_size = int(m * 0.03)
 	app.ui.header_size = app.ui.padding_size
-
 	app.ui.border_size = app.ui.padding_size * 2
 	app.ui.tile_size = int((m - app.ui.padding_size * 5 - app.ui.border_size * 2) / 4)
 	app.ui.font_size = int(m / 10)
-
-	// Mobile view: undo, theme, etc. buttons along the bottom
-	if f32(h) / f32(w) > 1.5 {
-		
-	}
 }
 
 fn (app &App) draw() {
@@ -154,29 +159,29 @@ fn (app &App) draw() {
 	app.draw_tiles()
 	app.gg.draw_text(labelx, labely, 'Points: $app.board.points', app.label_format(.points))
 	app.gg.draw_text(min(ww, wh) - labelx, labely, 'Moves: $app.moves', app.label_format(.moves))
-
+	
+	// TODO: Make transparency work in `gg`
 	if app.state == .over {
-		// app.gg.draw_rect(0, 0, ww, wh, gx.rgba(0, 0, 0, 44)) // TODO: Make transparency work
+		// app.gg.draw_rect(0, 0, ww, wh, gx.rgba(0, 0, 0, 44))
 		app.gg.draw_text(ww / 2, wh / 2, 'Game Over', app.label_format(.game_over))
 	}
 	if app.state == .victory {
-		// app.gg.draw_rect(0, 0, ww, wh, gx.rgba(0, 0, 0, 44)) // TODO: Make transparency work
+		// app.gg.draw_rect(0, 0, ww, wh, gx.rgba(0, 0, 0, 44))
 		app.gg.draw_text(ww / 2, wh / 2, 'Victory!', app.label_format(.victory))
 
 	}
 }
 
 fn (app &App) draw_tiles() {
-	// println(app.board.fieldtile_s)
 	xstart := app.ui.border_size
 	ystart := app.ui.border_size + app.ui.header_size
 	toffset := app.ui.tile_size + app.ui.padding_size
 	tiles_size := min(app.ui.window_width, app.ui.window_height) - app.ui.border_size * 2
 
-	// Padding around the tiles
+	// Draw the padding around the tiles
 	app.gg.draw_rect(xstart, ystart, tiles_size, tiles_size, app.theme.padding_color)
 
-	// The actual tiles
+	// Draw the actual tiles
 	for y in 0..4 {
 		for x in 0..4 {
 			tidx := app.board.field[y][x]
@@ -186,31 +191,25 @@ fn (app &App) draw_tiles() {
 			xoffset := xstart + app.ui.padding_size + (x) * toffset + (app.ui.tile_size - tw) / 2
 			yoffset := ystart + app.ui.padding_size + (y) * toffset + (app.ui.tile_size - th) / 2
 			app.gg.draw_rect(xoffset, yoffset, tw, th, tile_color)
-			// If tile is not empty
-			if tidx != 0 {
+			
+			if tidx != 0 { // 0 == blank spot
 				xpos := xoffset + tw / 2
 				ypos := yoffset + th / 2
-
 				fmt := app.label_format(.tile)
 
 				match app.tile_format {
 					.normal {
 						app.gg.draw_text(xpos, ypos, '${1 << tidx}', fmt)
-					}
-					.log {
+					} .log {
 						app.gg.draw_text(xpos, ypos, '$tidx', fmt)
-					}
-
-					.exponent {
+					} .exponent {
 						app.gg.draw_text(xpos, ypos, '2', fmt)
 						fs2 := app.ui.font_size * 2 / 3
 						app.gg.draw_text(xpos + app.ui.tile_size / 10, ypos - app.ui.tile_size / 8, '$tidx', { fmt | size: fs2, align: gx.HorizontalAlign.left })
-					}
-					.shifts {
+					} .shifts {
 						fs2 := app.ui.font_size * 2 / 3
 						app.gg.draw_text(xpos, ypos, '2<<${tidx - 1}', { fmt | size: fs2 })
-					}
-					.none_  {} // Don't draw any text here, colors only
+					} .none_ {} // Don't draw any text here, colors only
 					.end_ {} // Should never get here
 				}
 			}
@@ -219,7 +218,6 @@ fn (app &App) draw_tiles() {
 }
 
 fn on_event(e &sapp.Event, mut app App) {
-	// println(e)
 	match e.typ {
 		.key_down {
 			app.on_key_down(e.key_code)
@@ -229,19 +227,14 @@ fn on_event(e &sapp.Event, mut app App) {
 			if e.num_touches > 0 {
 				t := e.touches[0]
 				app.touch.start_pos = { x: int(t.pos_x), y: int(t.pos_y) }
-				// println(app.touch)
 			}
 		} .touches_ended {
 			if e.num_touches > 0 {
 				t := e.touches[0]
 				end_pos := Pos{ x: int(t.pos_x), y: int(t.pos_y) }
-				// println(app.touch)
-				// println(' => $end_pos')
 				app.handle_swipe(app.touch.start_pos, end_pos)
 			}
-		}
-
-		else {}
+		} else {}
 	}
 }
 
@@ -250,35 +243,29 @@ fn (mut app App) on_key_down(key sapp.KeyCode) {
 	match key {
 		.escape {
 			exit(0)
-		}
-		.space {
+		} .space {
 			app.new_random_tile()
-		}
-		.n {
+		} .n {
 			app.new_game()
-		}
-		.backspace {
+		} .backspace {
 			if app.undo.len > 0 {
 				app.state = .play
 				app.board = app.undo.pop()
 				app.moves--
 				return
 			}
-		}
-		.enter {
+		} .enter {
 			app.tile_format = int(app.tile_format) + 1
 			if app.tile_format == .end_ {
 				app.tile_format = .normal
 			}
-		}
-		.j {
+		} .j {
 			app.game_over()
-		}
-		.t {
+		} .t {
 			app.set_theme(if app.theme_idx == themes.len - 1 { 0 } else { app.theme_idx + 1 })
-		}
-		else {}
+		} else {}
 	}
+
 	if app.state == .play {
 		match key {
 			.w, .up    { app.move(.up) }
@@ -288,7 +275,6 @@ fn (mut app App) on_key_down(key sapp.KeyCode) {
 			else {}
 		}
 	}
-	// eprintln('app.board.points: $app.board.points')
 }
 
 fn (mut app App) handle_swipe(start, end Pos) {
@@ -298,11 +284,9 @@ fn (mut app App) handle_swipe(start, end Pos) {
 	ady := abs(dy)
 	dmax := max(adx, ady)
 	dmin := min(adx, ady)
-
-	// Swipe was too short
-	if dmax < min_swipe_distance { return }
-	// Diagonal swipe, don't move
-	if dmax / dmin < 2 { return }
+	
+	if dmax < min_swipe_distance { return } // Swipe was too short
+	if dmax / dmin < 2 { return } // Swiped diagonally
 
 	if adx > ady {
 		if dx < 0 { app.move(.left) } else { app.move(.right) }
