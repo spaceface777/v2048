@@ -292,8 +292,7 @@ fn main() {
 
 	mut font_path := os.resource_abs_path(os.join_path('assets', 'RobotoMono-Regular.ttf'))
 	$if android {
-		// the `assets/` folder is implied, since we're getting the font straight from the apk
-		font_path = 'RobotoMono-Regular.ttf'
+		font_path = 'assets/RobotoMono-Regular.ttf'
 	}
 
 	app.gg = gg.new_context({
@@ -302,7 +301,7 @@ fn main() {
 		height: default_window_height
 		use_ortho: false
 		create_window: true
-		window_title: 'canvas'
+		window_title: 'V 2048'
 		frame_fn: frame
 		event_fn: on_event
 		user_data: app
