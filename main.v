@@ -1,11 +1,11 @@
 import gg
-import gx
 import os
 import rand
+import time
 
 struct App {
 mut:
-	gg            &gg.Context
+	gg            &gg.Context = 0
 	touch         TouchInfo
 	ui            Ui = Ui{}
 	theme         &Theme = themes[0]
@@ -16,6 +16,17 @@ mut:
 	state         GameState = .play
 	tile_format   TileFormat = .normal
 	moves         int
+	perf          &Perf = 0
+}
+
+// Used for performance monitoring in `showfps()` when `-d showfps` is passed.
+// Unused in all other cases, and should be optimized out in `-prod` builds
+struct Perf {
+mut:
+	frame     int
+	frame_old int
+	frame_sw  time.StopWatch = time.new_stopwatch({})
+	second_sw time.StopWatch = time.new_stopwatch({})
 }
 
 struct Pos {
@@ -78,18 +89,16 @@ fn (b Board) hmirror() Board {
 	return res
 }
 
+// GCC optimization bug; inlining fails when compiled with -prod
+[no_inline]
 fn (t TileLine) to_left() TileLine {
 	right_border_idx := 5
 	mut res := t
 	mut zeros := 0
 	mut nonzeros := 0
 	// gather meta info about the line:
-	for x in 0..4 {
-		if res.field[x] == 0 {
-			zeros++
-		} else {
-			nonzeros++
-		}
+	for x in res.field {
+		if x == 0 { zeros++ } else { nonzeros++ }
 	}
 	if nonzeros == 0 {
 		// when all the tiles are empty, there is nothing left to do
@@ -129,7 +138,7 @@ fn (t TileLine) to_left() TileLine {
 fn (b Board) to_left() Board {
 	mut res := b
 	for y in 0..4 {
-		mut hline := TileLine{y}
+		mut hline := TileLine{ypos: y}
 		for x in 0..4 {
 			hline.field[x] = b.field[y][x]
 		}
@@ -225,7 +234,7 @@ fn (mut app App) new_random_tile() {
 		rint := rand.intn(8)
 		random_value := if rint == 0 { 2 } else { 1 }
 		app.board.field[empty_pos.y][empty_pos.x] = random_value
-		app.atickers[empty_pos.y][empty_pos.x] = 15
+		app.atickers[empty_pos.y][empty_pos.x] = animation_length
 	}
 	app.check_for_victory()
 	app.check_for_game_over()
@@ -256,13 +265,42 @@ fn (mut app App) move(d Direction) {
 }
 
 fn frame(mut app App) {
-	app.update_tickers()
+	$if showfps? {
+		app.perf.frame_sw.restart()
+	}
 	app.gg.begin()
+	app.update_tickers()
 	app.draw()
 	app.gg.end()
+	$if showfps? {
+		app.showfps()
+	}
 }
 
-// TODO: Move this somewhere else once Android support is merged
+fn init(mut app App) {
+	$if showfps? {
+		app.perf.frame_sw.restart()
+		app.perf.second_sw.restart()
+	}
+	app.resize()
+}
+
+fn (mut app App) showfps() {
+	println(app.perf.frame_sw.elapsed().microseconds())
+	app.perf.frame++
+	f := app.perf.frame
+	if (f & 127) == 0 {
+		last_frame_us := app.perf.frame_sw.elapsed().microseconds()
+		ticks := f64(app.perf.second_sw.elapsed().milliseconds())
+		fps := f64(app.perf.frame - app.perf.frame_old) * ticks / 1000 / 4.5
+		last_fps := 128_000.0 / ticks
+		eprintln('frame ${f:-5} | avg. fps: ${fps:-5.1f} | avg. last 128 fps: ${last_fps:-5.1f} | last frame time: ${last_frame_us:-4}µs')
+		app.perf.second_sw.restart()
+		app.perf.frame_old = f
+	}
+}
+
+// TODO: Move this somewhere else (vlib?) once Android support is merged
 $if android {
 	#include <android/log.h>
 	#define LOG_TAG "v_logcat_test"
@@ -287,12 +325,24 @@ fn abs(a int) int {
 }
 
 fn main() {
-	mut app := &App{ gg: 0 }
+	mut app := &App{}
 	app.new_game()
 
 	mut font_path := os.resource_abs_path(os.join_path('assets', 'RobotoMono-Regular.ttf'))
 	$if android {
 		font_path = 'assets/RobotoMono-Regular.ttf'
+	}
+
+	mut window_title := 'V 2048'
+	// TODO: Make emcc a real platform ifdef
+	$if emscripten? {
+		// in emscripten, sokol uses `window_title` as the selector to the canvas it'll render to,
+		// and since `document.querySelector('V 2048')` isn't valid JS, we use `canvas` instead
+		window_title = 'canvas'
+	}
+
+	$if showfps? {
+		app.perf = &Perf{}
 	}
 
 	app.gg = gg.new_context({
@@ -301,9 +351,10 @@ fn main() {
 		height: default_window_height
 		use_ortho: false
 		create_window: true
-		window_title: 'V 2048'
+		window_title: window_title
 		frame_fn: frame
 		event_fn: on_event
+		init_fn: init
 		user_data: app
 		font_path: font_path
 	})
