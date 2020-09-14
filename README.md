@@ -1,7 +1,8 @@
-# v2048
+# Deprecation notice
+This fork has been merged into v/examples. That version should be used instead.
+However, you can find prebuilt binaries in [the releases page](https://github.com/spaceface777/v2048/releases/tag/v0.1.0).
 
+## v2048
 This is a simple [2048 game](https://play2048.co/), written in [the V programming language](https://vlang.io/).
-![2048 Game Screenshot](https://url4e.com/gyazo/images/1ad829cf.png)
+![2048 Game Screenshot](https://raw.githubusercontent.com/vlang/v/4aaeaa433157b9e8735d7022f27ff3b1b52614d1/examples/2048/demo.png)
 
-## Notes
-This game is tested to work with V 0.1.29 b2fee21, but probably can be compiled with a more recent V compiler too.
